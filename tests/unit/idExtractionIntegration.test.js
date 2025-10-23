@@ -69,6 +69,7 @@ describe('ID Extraction Integration Tests', () => {
 
     // Mock SELECT to return existing attachment metadata
     const mockExistingRecord = {
+      ID: "attachment-single-id",
       filename: "test-document.pdf",
       mimeType: "application/pdf", 
       url: "promo/23ea8fec-6168-4f53-9f06-a60789a66bf8#test-document.pdf"
@@ -94,15 +95,15 @@ describe('ID Extraction Integration Tests', () => {
 
     await attachmentsService.nonDraftHandler(req, mockAttachment, mockSrv)
 
-    // Verify SELECT was called correctly
-    expect(mockSelect.from).toHaveBeenCalledWith(mockAttachment, { ID: '23ea8fec-6168-4f53-9f06-a60789a66bf8' })
-    expect(mockColumns).toHaveBeenCalledWith("filename", "mimeType", "url")
+    // Verify SELECT was called correctly (single attachment uses up__ID)
+    expect(mockSelect.from).toHaveBeenCalledWith(mockAttachment, { up__ID: '23ea8fec-6168-4f53-9f06-a60789a66bf8' })
+    expect(mockColumns).toHaveBeenCalledWith("filename", "mimeType", "url", "ID")
 
     // Verify that the correct data including filename was passed to put method
     expect(putSpy).toHaveBeenCalledWith(
       mockAttachment,
       [{
-        ID: '23ea8fec-6168-4f53-9f06-a60789a66bf8',
+        ID: 'attachment-single-id', // Use the actual attachment ID from database
         content: req.content,
         filename: 'test-document.pdf',
         mimeType: 'application/pdf',
@@ -140,6 +141,7 @@ describe('ID Extraction Integration Tests', () => {
 
     // Mock SELECT to return existing attachment metadata  
     const mockExistingRecord = {
+      ID: "attachment-567-890",
       filename: "incident-report.xlsx",
       mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
       url: "incidents/attachment-567-890#incident-report.xlsx"
@@ -165,7 +167,7 @@ describe('ID Extraction Integration Tests', () => {
 
     // Verify SELECT was called correctly
     expect(mockSelect.from).toHaveBeenCalledWith(mockAttachment, { ID: 'attachment-567-890' })
-    expect(mockColumns).toHaveBeenCalledWith("filename", "mimeType", "url")
+    expect(mockColumns).toHaveBeenCalledWith("filename", "mimeType", "url", "ID")
 
     // Verify that the correct attachment data including metadata was extracted
     expect(putSpy).toHaveBeenCalledWith(
@@ -205,6 +207,7 @@ describe('ID Extraction Integration Tests', () => {
     
     // Mock SELECT to return existing attachment metadata
     const mockExistingRecord = {
+      ID: "query-attachment-id",
       filename: "query-test.pdf",
       mimeType: "application/pdf",
       url: "promo/query-param-test-id#query-test.pdf"
@@ -235,13 +238,13 @@ describe('ID Extraction Integration Tests', () => {
     )
 
     // Verify SELECT was called correctly
-    expect(mockSelect.from).toHaveBeenCalledWith(mockAttachment, { ID: 'query-param-test-id' })
-    expect(mockColumns).toHaveBeenCalledWith("filename", "mimeType", "url")
+    expect(mockSelect.from).toHaveBeenCalledWith(mockAttachment, { up__ID: 'query-param-test-id' })
+    expect(mockColumns).toHaveBeenCalledWith("filename", "mimeType", "url", "ID")
 
     expect(putSpy).toHaveBeenCalledWith(
       mockAttachment,
       [{
-        ID: 'query-param-test-id',
+        ID: 'query-attachment-id',
         content: req.content,
         filename: 'query-test.pdf',
         mimeType: 'application/pdf',

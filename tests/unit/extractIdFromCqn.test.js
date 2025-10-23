@@ -24,7 +24,7 @@ describe('ID Extraction Helper Function', () => {
     }
     
     const result = extractIdFromCqn(cqn)
-    expect(result).toBe('attachment-id-456')
+    expect(result).toEqual({ id: 'attachment-id-456', isSingleAttachment: false })
   })
 
   test('should extract ID from single attachment case (where clause on first ref)', () => {
@@ -47,7 +47,7 @@ describe('ID Extraction Helper Function', () => {
     }
     
     const result = extractIdFromCqn(cqn)
-    expect(result).toBe('23ea8fec-6168-4f53-9f06-a60789a66bf8')
+    expect(result).toEqual({ id: '23ea8fec-6168-4f53-9f06-a60789a66bf8', isSingleAttachment: true })
   })
 
   test('should extract ID from complex where clause with multiple conditions', () => {
@@ -78,7 +78,7 @@ describe('ID Extraction Helper Function', () => {
     }
     
     const result = extractIdFromCqn(cqn)
-    expect(result).toBe('complex-id-789')
+    expect(result).toEqual({ id: 'complex-id-789', isSingleAttachment: true })
   })
 
   test('should handle where clause directly on from object', () => {
@@ -96,7 +96,7 @@ describe('ID Extraction Helper Function', () => {
     }
     
     const result = extractIdFromCqn(cqn)
-    expect(result).toBe('direct-where-id')
+    expect(result).toEqual({ id: 'direct-where-id', isSingleAttachment: false })
   })
 
   test('should return null when no ID is found', () => {
@@ -153,7 +153,7 @@ describe('ID Extraction Helper Function', () => {
     }
     
     const result = extractIdFromCqn(cqn)
-    expect(result).toBe('position-test-id')
+    expect(result).toEqual({ id: 'position-test-id', isSingleAttachment: false })
   })
 
   test('should extract first ID when multiple IDs exist', () => {
@@ -178,6 +178,6 @@ describe('ID Extraction Helper Function', () => {
     }
     
     const result = extractIdFromCqn(cqn)
-    expect(result).toBe('first-id')
+    expect(result).toEqual({ id: 'first-id', isSingleAttachment: false })
   })
 })
