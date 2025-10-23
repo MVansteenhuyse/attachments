@@ -107,6 +107,51 @@ describe("Tests for uploading/deleting and fetching attachments through API call
     expect(fetchResponse.data.byteLength).to.be.greaterThan(0)
   })
 
+  it("should handle content upload with metadata fetching from database", async () => {
+    // Create attachment metadata first
+    const attachmentID = await createAttachmentMetadata(incidentID, "test-metadata.pdf")
+    
+    // Upload content - this will trigger the nonDraftHandler which should fetch metadata from DB
+    const contentPath = "content/sample.pdf"
+    const fileContent = fs.readFileSync(
+      path.join(__dirname, "..", "integration", contentPath)
+    )
+    
+    const response = await axios.put(
+      `/odata/v4/processor/Incidents(${incidentID})/attachments(up__ID=${incidentID},ID=${attachmentID})/content`,
+      fileContent,
+      {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Length": fileContent.length,
+        },
+      }
+    )
+    
+    expect(response.status).to.equal(204)
+    
+    // Wait for processing to complete
+    await delay()
+    
+    // Verify that the attachment metadata is still intact (filename should be preserved)
+    const metadataResponse = await axios.get(
+      `/odata/v4/processor/Incidents(${incidentID})/attachments(up__ID=${incidentID},ID=${attachmentID})`
+    )
+    
+    expect(metadataResponse.status).to.equal(200)
+    expect(metadataResponse.data.filename).to.equal("test-metadata.pdf")
+    expect(metadataResponse.data.ID).to.equal(attachmentID)
+    
+    // Verify the content can be fetched
+    const contentResponse = await axios.get(
+      `/odata/v4/processor/Incidents(${incidentID})/attachments(up__ID=${incidentID},ID=${attachmentID})/content`,
+      { responseType: 'arraybuffer' }
+    )
+    
+    expect(contentResponse.status).to.equal(200)
+    expect(contentResponse.data.byteLength).to.be.greaterThan(0)
+  })
+
   it("should list attachments for incident", async () => {
     const attachmentID = await createAttachmentMetadata(incidentID)
     await uploadAttachmentContent(incidentID, attachmentID)

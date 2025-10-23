@@ -1,9 +1,16 @@
 // Integration test for ID extraction with different attachment scenarios
 
-// Mock CDS module for integration testing
+// Mock the SELECT function properly to match CDS API
+const mockSelect = {
+  from: jest.fn().mockReturnValue({
+    columns: jest.fn().mockResolvedValue(null)
+  })
+}
+
+// Mock CDS module for integration testing  
 jest.mock('@sap/cds', () => ({
   ql: {
-    SELECT: jest.fn(),
+    SELECT: mockSelect,
     UPSERT: jest.fn(),
     UPDATE: jest.fn()
   },
@@ -60,13 +67,24 @@ describe('ID Extraction Integration Tests', () => {
 
     cds.odata.parse.mockReturnValue(singleAttachmentCqn)
 
-    // Mock the put method to track what ID was extracted
+    // Mock SELECT to return existing attachment metadata
+    const mockExistingRecord = {
+      filename: "test-document.pdf",
+      mimeType: "application/pdf", 
+      url: "promo/23ea8fec-6168-4f53-9f06-a60789a66bf8#test-document.pdf"
+    }
+    
+    // Reset and configure the mock
+    mockSelect.from.mockClear()
+    const mockColumns = jest.fn().mockResolvedValue(mockExistingRecord)
+    mockSelect.from.mockReturnValue({ columns: mockColumns })
+
+    // Mock the put method to track what data was passed
     const putSpy = jest.spyOn(attachmentsService, 'put').mockResolvedValue([])
 
     const req = {
       content: {
         url: '/odata/v4/promo/Promo(ID=23ea8fec-6168-4f53-9f06-a60789a66bf8)/attachments/content',
-        // Some mock content
         type: 'application/pdf'
       }
     }
@@ -76,10 +94,20 @@ describe('ID Extraction Integration Tests', () => {
 
     await attachmentsService.nonDraftHandler(req, mockAttachment, mockSrv)
 
-    // Verify that the correct ID was extracted and passed to put method
+    // Verify SELECT was called correctly
+    expect(mockSelect.from).toHaveBeenCalledWith(mockAttachment, { ID: '23ea8fec-6168-4f53-9f06-a60789a66bf8' })
+    expect(mockColumns).toHaveBeenCalledWith("filename", "mimeType", "url")
+
+    // Verify that the correct data including filename was passed to put method
     expect(putSpy).toHaveBeenCalledWith(
       mockAttachment,
-      [{ ID: '23ea8fec-6168-4f53-9f06-a60789a66bf8', content: req.content }],
+      [{
+        ID: '23ea8fec-6168-4f53-9f06-a60789a66bf8',
+        content: req.content,
+        filename: 'test-document.pdf',
+        mimeType: 'application/pdf',
+        url: 'promo/23ea8fec-6168-4f53-9f06-a60789a66bf8#test-document.pdf'
+      }],
       null,
       false
     )
@@ -110,6 +138,17 @@ describe('ID Extraction Integration Tests', () => {
 
     cds.odata.parse.mockReturnValue(manyAttachmentsCqn)
 
+    // Mock SELECT to return existing attachment metadata  
+    const mockExistingRecord = {
+      filename: "incident-report.xlsx",
+      mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      url: "incidents/attachment-567-890#incident-report.xlsx"
+    }
+    
+    mockSelect.from.mockClear()
+    const mockColumns = jest.fn().mockResolvedValue(mockExistingRecord)
+    mockSelect.from.mockReturnValue({ columns: mockColumns })
+
     const putSpy = jest.spyOn(attachmentsService, 'put').mockResolvedValue([])
 
     const req = {
@@ -124,10 +163,20 @@ describe('ID Extraction Integration Tests', () => {
 
     await attachmentsService.nonDraftHandler(req, mockAttachment, mockSrv)
 
-    // Verify that the correct attachment ID was extracted
+    // Verify SELECT was called correctly
+    expect(mockSelect.from).toHaveBeenCalledWith(mockAttachment, { ID: 'attachment-567-890' })
+    expect(mockColumns).toHaveBeenCalledWith("filename", "mimeType", "url")
+
+    // Verify that the correct attachment data including metadata was extracted
     expect(putSpy).toHaveBeenCalledWith(
       mockAttachment,
-      [{ ID: 'attachment-567-890', content: req.content }],
+      [{
+        ID: 'attachment-567-890',
+        content: req.content,
+        filename: 'incident-report.xlsx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        url: 'incidents/attachment-567-890#incident-report.xlsx'
+      }],
       null,
       false
     )
@@ -153,6 +202,18 @@ describe('ID Extraction Integration Tests', () => {
     }
 
     cds.odata.parse.mockReturnValue(cqnWithQueryParams)
+    
+    // Mock SELECT to return existing attachment metadata
+    const mockExistingRecord = {
+      filename: "query-test.pdf",
+      mimeType: "application/pdf",
+      url: "promo/query-param-test-id#query-test.pdf"
+    }
+    
+    mockSelect.from.mockClear()
+    const mockColumns = jest.fn().mockResolvedValue(mockExistingRecord)
+    mockSelect.from.mockReturnValue({ columns: mockColumns })
+    
     const putSpy = jest.spyOn(attachmentsService, 'put').mockResolvedValue([])
 
     const req = {
@@ -173,9 +234,19 @@ describe('ID Extraction Integration Tests', () => {
       { service: mockSrv }
     )
 
+    // Verify SELECT was called correctly
+    expect(mockSelect.from).toHaveBeenCalledWith(mockAttachment, { ID: 'query-param-test-id' })
+    expect(mockColumns).toHaveBeenCalledWith("filename", "mimeType", "url")
+
     expect(putSpy).toHaveBeenCalledWith(
       mockAttachment,
-      [{ ID: 'query-param-test-id', content: req.content }],
+      [{
+        ID: 'query-param-test-id',
+        content: req.content,
+        filename: 'query-test.pdf',
+        mimeType: 'application/pdf',
+        url: 'promo/query-param-test-id#query-test.pdf'
+      }],
       null,
       false
     )
@@ -213,6 +284,46 @@ describe('ID Extraction Integration Tests', () => {
     await expect(
       attachmentsService.nonDraftHandler(req, mockAttachment, mockSrv)
     ).rejects.toThrow('ID not found in request URL')
+  })
+
+  test('should throw error when attachment record is not found in database', async () => {
+    const singleAttachmentCqn = {
+      SELECT: {
+        from: {
+          ref: [
+            {
+              id: "test.Service.Entity",
+              where: [
+                { ref: ["ID"] },
+                "=",
+                { val: "non-existent-id" }
+              ]
+            },
+            "attachments"
+          ]
+        }
+      }
+    }
+
+    cds.odata.parse.mockReturnValue(singleAttachmentCqn)
+
+    // Mock SELECT to return null (record not found)
+    mockSelect.from.mockClear()
+    const mockColumns = jest.fn().mockResolvedValue(null)
+    mockSelect.from.mockReturnValue({ columns: mockColumns })
+
+    const req = {
+      content: {
+        url: '/odata/v4/test/Entity(ID=non-existent-id)/attachments/content'
+      }
+    }
+
+    const mockAttachment = { name: 'TestAttachments' }
+    const mockSrv = {}
+
+    await expect(
+      attachmentsService.nonDraftHandler(req, mockAttachment, mockSrv)
+    ).rejects.toThrow('Attachment with ID non-existent-id not found')
   })
 
   test('should not process non-content URLs', async () => {
