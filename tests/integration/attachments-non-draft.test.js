@@ -73,6 +73,40 @@ describe("Tests for uploading/deleting and fetching attachments through API call
     expect(response.status).to.equal(204)
   })
 
+  it("should upload attachment content with timestamp query parameter", async () => {
+    const attachmentID = await createAttachmentMetadata(incidentID)
+    
+    // Upload content using URL with query parameters (simulating timestamp)
+    const contentPath = "content/sample.pdf"
+    const fileContent = fs.readFileSync(
+      path.join(__dirname, "..", "integration", contentPath)
+    )
+    
+    // Add timestamp query parameter to the URL
+    const timestamp = Date.now()
+    const response = await axios.put(
+      `/odata/v4/processor/Incidents(${incidentID})/attachments(up__ID=${incidentID},ID=${attachmentID})/content?timestamp=${timestamp}&version=1`,
+      fileContent,
+      {
+        headers: {
+          "Content-Type": "application/pdf",
+          "Content-Length": fileContent.length,
+        },
+      }
+    )
+    
+    expect(response.status).to.equal(204)
+    
+    // Verify the content was actually uploaded by fetching it
+    const fetchResponse = await axios.get(
+      `/odata/v4/processor/Incidents(${incidentID})/attachments(up__ID=${incidentID},ID=${attachmentID})/content`,
+      { responseType: 'arraybuffer' }
+    )
+    expect(fetchResponse.status).to.equal(200)
+    expect(fetchResponse.data).to.exist
+    expect(fetchResponse.data.byteLength).to.be.greaterThan(0)
+  })
+
   it("should list attachments for incident", async () => {
     const attachmentID = await createAttachmentMetadata(incidentID)
     await uploadAttachmentContent(incidentID, attachmentID)
